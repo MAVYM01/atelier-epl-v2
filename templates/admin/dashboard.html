@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Administration{% endblock %}
+{% block content %}
+<div class="dashboard">
+    <h1>👑 Tableau de bord - Administration</h1>
+    
+    <!-- STATISTIQUES -->
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon">🛠️</div><div class="stat-value">{{ total_machines }}</div><div class="stat-label">Machines</div></div>
+        <div class="stat-card success"><div class="stat-icon">✅</div><div class="stat-value">{{ machines_ok }}</div><div class="stat-label">Opérationnelles</div></div>
+        <div class="stat-card danger"><div class="stat-icon">🔴</div><div class="stat-value">{{ machines_panne }}</div><div class="stat-label">En panne</div></div>
+        <div class="stat-card warning"><div class="stat-icon">⚠️</div><div class="stat-value">{{ alertes_stock }}</div><div class="stat-label">Alertes stock</div></div>
+        <div class="stat-card info"><div class="stat-icon">👥</div><div class="stat-value">{{ inscriptions_attente }}</div><div class="stat-label">Inscriptions en attente</div></div>
+    </div>
+
+    <!-- INSCRIPTIONS EN ATTENTE -->
+    <div class="card" id="users">
+        <h2>📋 Inscriptions en attente de validation</h2>
+        {% if inscriptions %}
+        <table class="data-table">
+            <thead><tr><th>Nom</th><th>Email</th><th>Rôle</th><th>Date</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for u in inscriptions %}
+                <tr>
+                    <td>{{ u.nom_complet }}</td>
+                    <td>{{ u.email }}</td>
+                    <td>{{ u.role }}</td>
+                    <td>{{ u.created_at }}</td>
+                    <td>
+                        <a href="{{ url_for('admin_valider_inscription', user_id=u.id) }}" class="btn-validate">✅ Valider</a>
+                        <a href="{{ url_for('admin_refuser_inscription', user_id=u.id) }}" class="btn-reject">❌ Refuser</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>Aucune inscription en attente.</p>
+        {% endif %}
+    </div>
+
+    <!-- GESTION MACHINES -->
+    <div class="card" id="machines">
+        <h2>🛠️ Gestion des machines</h2>
+        <div class="add-form">
+            <form method="POST" action="{{ url_for('admin_ajouter_machine') }}" class="inline-form">
+                <input type="text" name="machine_id" placeholder="ID (ex: EPL-TRN-006)" required>
+                <input type="text" name="nom" placeholder="Nom" required>
+                <input type="text" name="disjoncteur" placeholder="Disjoncteur">
+                <input type="number" step="0.1" name="puissance" placeholder="Puissance (kW)" required>
+                <input type="text" name="consignes" placeholder="Consignes sécurité">
+                <input type="text" name="epi" placeholder="EPI requis">
+                <button type="submit" class="btn-add">➕ Ajouter</button>
+            </form>
+        </div>
+        <table class="data-table">
+            <thead><tr><th>ID</th><th>Nom</th><th>Statut</th><th>Heures</th><th>Puissance</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for m in machines %}
+                <tr>
+                    <td>{{ m.id }}</td>
+                    <td>{{ m.nom }}</td>
+                    <td><span class="badge badge-{{ m.statut }}">{{ m.statut }}</span></td>
+                    <td>{{ m.compteur_heures }}</td>
+                    <td>{{ m.puissance_elec }} kW</td>
+                    <td>
+                        {% if m.statut == 'panne' or m.statut == 'reparation' %}
+                            <a href="{{ url_for('admin_reparer_machine', machine_id=m.id) }}" class="btn-repair">🔧 Réparer</a>
+                        {% endif %}
+                        {% if m.statut != 'irreparable' %}
+                            <a href="{{ url_for('admin_irreparable_machine', machine_id=m.id) }}" class="btn-irreparable">⚫ Irréparable</a>
+                        {% endif %}
+                        <a href="{{ url_for('admin_supprimer_machine', machine_id=m.id) }}" class="btn-delete">🗑️</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- GESTION STOCKS -->
+    <div class="card" id="stocks">
+        <h2>📦 Gestion des consommables</h2>
+        <div class="add-form">
+            <form method="POST" action="{{ url_for('admin_ajouter_consommable') }}" class="inline-form">
+                <input type="text" name="reference" placeholder="Réf. (ex: SOU-003)" required>
+                <input type="text" name="designation" placeholder="Désignation" required>
+                <select name="categorie">
+                    <option value="soudure">🔥 Soudure</option>
+                    <option value="coupe">✂️ Coupe</option>
+                    <option value="lubrifiant">🛢️ Lubrifiant</option>
+                    <option value="securite">🛡️ Sécurité</option>
+                    <option value="autre">📦 Autre</option>
+                </select>
+                <input type="text" name="unite" placeholder="Unité (kg, L, ...)" required>
+                <input type="number" name="stock_minimum" placeholder="Stock minimum" required>
+                <button type="submit" class="btn-add">➕ Ajouter</button>
+            </form>
+        </div>
+        <table class="data-table">
+            <thead><tr><th>Réf.</th><th>Désignation</th><th>Catégorie</th><th>Stock</th><th>Min</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for c in consommables %}
+                <tr class="{% if c.quantite_stock <= c.stock_minimum %}alert-row{% endif %}">
+                    <td>{{ c.reference }}</td>
+                    <td>{{ c.designation }}</td>
+                    <td>{{ c.categorie }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('admin_modifier_stock', cid=c.id) }}" class="stock-form">
+                            <input type="number" name="quantite" value="{{ c.quantite_stock }}" class="stock-input">
+                            <button type="submit" class="btn-update">Mettre à jour</button>
+                        </form>
+                    </td>
+                    <td>{{ c.stock_minimum }}</td>
+                    <td>
+                        <a href="{{ url_for('admin_supprimer_consommable', cid=c.id) }}" class="btn-delete">🗑️</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

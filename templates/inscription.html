@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Inscription{% endblock %}
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <img src="{{ url_for('static', filename='images/logo_epl.png') }}" alt="EPL" class="login-logo">
+            <h1>Créer un compte</h1>
+            <p class="subtitle">Atelier Mécanique EPL</p>
+        </div>
+        
+        <form method="POST" class="login-form">
+            <div class="form-group">
+                <label><i class="fas fa-user"></i> Nom complet</label>
+                <input type="text" name="nom_complet" placeholder="Votre nom et prénom" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-user-tag"></i> Nom d'utilisateur</label>
+                <input type="text" name="username" placeholder="Choisissez un pseudo" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-envelope"></i> Email</label>
+                <input type="email" name="email" placeholder="exemple@epl.tg" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-briefcase"></i> Profession</label>
+                <input type="text" name="profession" placeholder="Étudiant, Enseignant, ...">
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-user-shield"></i> Rôle</label>
+                <select name="role" required>
+                    <option value="etudiant">🎓 Étudiant</option>
+                    <option value="enseignant">👨‍🏫 Enseignant</option>
+                    <option value="magasinier">📦 Magasinier</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-lock"></i> Mot de passe</label>
+                <input type="password" name="password" placeholder="Minimum 6 caractères" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-lock"></i> Confirmer</label>
+                <input type="password" name="confirm_password" placeholder="Répétez le mot de passe" required>
+            </div>
+            <button type="submit" class="btn-login">S'inscrire</button>
+        </form>
+        
+        <div class="login-footer">
+            <p>Déjà inscrit ? <a href="{{ url_for('login') }}">Se connecter</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

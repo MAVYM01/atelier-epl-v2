@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Créer une séance TP{% endblock %}
+{% block content %}
+<div class="card">
+    <h1>📝 Créer une séance de TP</h1>
+    <form method="POST" class="form">
+        <div class="form-group">
+            <label>Titre de la séance</label>
+            <input type="text" name="titre" placeholder="ex: TP Tournage" required>
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea name="description" placeholder="Objectifs, consignes, ..."></textarea>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" name="date_seance" required>
+            </div>
+            <div class="form-group">
+                <label>Heure début</label>
+                <input type="time" name="heure_debut" required>
+            </div>
+            <div class="form-group">
+                <label>Heure fin</label>
+                <input type="time" name="heure_fin" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" name="est_recurrent" value="1">
+                Séance récurrente (chaque semaine)
+            </label>
+            <input type="text" name="recurrence" placeholder="ex: Tous les lundis">
+        </div>
+        <button type="submit" class="btn-submit">✅ Créer la séance</button>
+        <a href="{{ url_for('enseignant_dashboard') }}" class="btn-cancel">Annuler</a>
+    </form>
+</div>
+{% endblock %}

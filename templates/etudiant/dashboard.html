@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Étudiant{% endblock %}
+{% block content %}
+<div class="dashboard">
+    <h1>🎓 Tableau de bord - Étudiant</h1>
+
+    <!-- TP DISPONIBLES -->
+    <div class="card">
+        <h2>📝 TP disponibles</h2>
+        <table class="data-table">
+            <thead><tr><th>Titre</th><th>Enseignant</th><th>Date</th><th>Heure</th><th>Inscrits</th><th>Action</th></tr></thead>
+            <tbody>
+                {% for t in tp_disponibles %}
+                <tr>
+                    <td>{{ t.titre }}</td>
+                    <td>{{ t.enseignant_nom }}</td>
+                    <td>{{ t.date_seance }}</td>
+                    <td>{{ t.heure_debut }} - {{ t.heure_fin }}</td>
+                    <td>{{ t.nb_inscrits }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('inscrire_tp', seance_id=t.id) }}">
+                            <button type="submit" class="btn-submit">S'inscrire</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MES INSCRIPTIONS -->
+    <div class="card">
+        <h2>📋 Mes inscriptions</h2>
+        <table class="data-table">
+            <thead><tr><th>Titre</th><th>Enseignant</th><th>Date</th><th>Statut</th></tr></thead>
+            <tbody>
+                {% for i in mes_inscriptions %}
+                <tr>
+                    <td>{{ i.titre }}</td>
+                    <td>{{ i.enseignant_nom }}</td>
+                    <td>{{ i.date_seance }}</td>
+                    <td><span class="badge badge-{{ i.inscription_statut }}">{{ i.inscription_statut }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MACHINES DISPONIBLES + RÉSERVATION -->
+    <div class="card">
+        <h2>🛠️ Machines disponibles</h2>
+        <table class="data-table">
+            <thead><tr><th>Nom</th><th>Statut</th><th>Action</th></tr></thead>
+            <tbody>
+                {% for m in machines %}
+                <tr>
+                    <td>{{ m.nom }}</td>
+                    <td><span class="badge badge-operationnel">✅ Opérationnel</span></td>
+                    <td>
+                        <button onclick="reserverMachine('{{ m.id }}')" class="btn-submit">📅 Réserver</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MES RÉSERVATIONS -->
+    <div class="card">
+        <h2>📅 Mes réservations</h2>
+        <table class="data-table">
+            <thead><tr><th>Machine</th><th>Date</th><th>Heure</th><th>Statut</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for r in mes_reservations %}
+                <tr>
+                    <td>{{ r.machine_nom }}</td>
+                    <td>{{ r.date_reservation }}</td>
+                    <td>{{ r.heure_debut }} - {{ r.heure_fin }}</td>
+                    <td><span class="badge badge-{{ r.statut }}">{{ r.statut }}</span></td>
+                    <td>
+                        <a href="{{ url_for('debuter_tp_reservation', reservation_id=r.id) }}" class="btn-start">🟢 Démarrer</a>
+                        <a href="{{ url_for('annuler_reservation', reservation_id=r.id) }}" class="btn-delete">🗑️</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- HISTORIQUE -->
+    <div class="card">
+        <h2>📜 Mon historique</h2>
+        <table class="data-table">
+            <thead><tr><th>Date</th><th>Machine</th><th>Action</th></tr></thead>
+            <tbody>
+                {% for h in historique %}
+                <tr>
+                    <td>{{ h.date_heure }}</td>
+                    <td>{{ h.machine_nom }}</td>
+                    <td>{{ h.type_action }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function reserverMachine(machineId) {
+    const date = prompt("Date (YYYY-MM-DD) :");
+    if (!date) return;
+    const debut = prompt("Heure début (HH:MM) :");
+    if (!debut) return;
+    const fin = prompt("Heure fin (HH:MM) :");
+    if (!fin) return;
+    const groupe = prompt("Membres du groupe (noms séparés par des virgules) :") || '';
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = "{{ url_for('reserver_machine') }}";
+    
+    const fields = {
+        'machine_id': machineId,
+        'date_reservation': date,
+        'heure_debut': debut,
+        'heure_fin': fin,
+        'membres_groupe': groupe
+    };
+    
+    for (const [name, value] of Object.entries(fields)) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+</script>
+{% endblock %}

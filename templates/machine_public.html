@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ machine.nom }} - Atelier EPL</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f0f2f5; min-height: 100vh; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; border-radius: 20px; padding: 30px; margin-bottom: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); }
+        .machine-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .machine-title h1 { font-size: 28px; color: #1a365d; }
+        .machine-id { color: #718096; font-size: 14px; margin-top: 5px; }
+        .status { padding: 8px 20px; border-radius: 30px; font-weight: 600; font-size: 14px; }
+        .status-operationnel { background: #c6f6d5; color: #22543d; }
+        .status-panne { background: #fed7d7; color: #742a2a; }
+        .status-reparation { background: #feebc8; color: #7b341e; }
+        .status-irreparable { background: #e2e8f0; color: #4a5568; }
+        .section { margin-top: 25px; }
+        .section h3 { font-size: 16px; color: #4a5568; margin-bottom: 10px; }
+        .specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; background: #f7fafc; padding: 20px; border-radius: 12px; }
+        .spec-item strong { display: block; color: #4a5568; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .spec-item span { font-size: 16px; font-weight: 500; color: #2d3748; }
+        .security { background: #fff5f5; padding: 20px; border-radius: 12px; border-left: 4px solid #e53e3e; }
+        .epi { background: #fefcbf; padding: 12px; border-radius: 8px; margin-top: 10px; font-size: 14px; }
+        .history-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .history-table th, .history-table td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        .history-table th { background: #f7fafc; font-weight: 600; color: #4a5568; }
+        .footer { text-align: center; color: #718096; margin-top: 30px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="machine-header">
+                <div class="machine-title">
+                    <h1>{{ machine.nom }}</h1>
+                    <div class="machine-id">ID: {{ machine.id }}</div>
+                </div>
+                <div class="status status-{{ machine.statut }}">
+                    {% if machine.statut == 'operationnel' %}✅ Opérationnel
+                    {% elif machine.statut == 'panne' %}🔴 En panne
+                    {% elif machine.statut == 'reparation' %}🟡 En réparation
+                    {% else %}⚫ Irréparable{% endif %}
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3>⚡ Spécifications techniques</h3>
+                <div class="specs">
+                    <div><strong>Disjoncteur</strong><span>{{ machine.disjoncteur or 'Non spécifié' }}</span></div>
+                    <div><strong>Puissance</strong><span>{{ machine.puissance_elec }} kW</span></div>
+                    <div><strong>Compteur</strong><span>{{ machine.compteur_heures }} heures</span></div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3>🛡️ Consignes de sécurité</h3>
+                <div class="security">
+                    <p>{{ machine.consignes_securite or 'À définir par l\'atelier' }}</p>
+                    <div class="epi"><strong>EPI requis :</strong> {{ machine.epi_requis or 'Lunettes, Gants, Blouse' }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>📜 Dernières utilisations</h3>
+            {% if historique %}
+            <table class="history-table">
+                <thead><tr><th>Date</th><th>Opérateur</th><th>Action</th></tr></thead>
+                <tbody>
+                    {% for h in historique %}
+                    <tr>
+                        <td>{{ h.date_heure }}</td>
+                        <td>{{ h.nom_complet or 'Anonyme' }}</td>
+                        <td>{{ h.type_action }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #718096;">Aucune utilisation enregistrée</p>
+            {% endif %}
+        </div>
+        
+        <div class="footer">
+            <p>Atelier Mécanique - École Polytechnique de Lomé</p>
+            <p style="font-size: 12px;">Version 1.0 - Juin 2026</p>
+        </div>
+    </div>
+</body>
+</html>

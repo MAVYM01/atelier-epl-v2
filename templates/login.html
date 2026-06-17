@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Connexion{% endblock %}
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <img src="{{ url_for('static', filename='images/logo_epl.png') }}" alt="EPL" class="login-logo">
+            <h1>Atelier Mécanique</h1>
+            <p class="subtitle">École Polytechnique de Lomé</p>
+            <p class="version">Version 1.0 - Juin 2026</p>
+        </div>
+        
+        <form method="POST" class="login-form">
+            <div class="form-group">
+                <label><i class="fas fa-envelope"></i> Email</label>
+                <input type="email" name="email" placeholder="exemple@epl.tg" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-lock"></i> Mot de passe</label>
+                <input type="password" name="password" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn-login">Se connecter</button>
+        </form>
+        
+        <div class="login-footer">
+            <p>Pas encore de compte ? <a href="{{ url_for('inscription') }}">S'inscrire</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

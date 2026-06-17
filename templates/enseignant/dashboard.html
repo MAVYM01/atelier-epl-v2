@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Enseignant{% endblock %}
+{% block content %}
+<div class="dashboard">
+    <h1>👨‍🏫 Tableau de bord - Enseignant</h1>
+    
+    <div class="stats-mini">
+        <div class="stat-mini success"><div>✅</div><div>{{ machines_ok|length }}</div><div>Machines OK</div></div>
+        <div class="stat-mini danger"><div>🔴</div><div>{{ machines_panne|length }}</div><div>En panne</div></div>
+        <div class="stat-mini warning"><div>⚠️</div><div>{{ alertes|length }}</div><div>Alertes stock</div></div>
+    </div>
+
+    <!-- MACHINES -->
+    <div class="card">
+        <h2>🛠️ Machines disponibles</h2>
+        <table class="data-table">
+            <thead><tr><th>ID</th><th>Nom</th><th>Statut</th><th>Heures</th></tr></thead>
+            <tbody>
+                {% for m in machines_ok %}
+                <tr><td>{{ m.id }}</td><td>{{ m.nom }}</td><td><span class="badge badge-operationnel">✅ Opérationnel</span></td><td>{{ m.compteur_heures }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>🔴 Machines en panne / réparation</h2>
+        <table class="data-table">
+            <thead><tr><th>ID</th><th>Nom</th><th>Statut</th></tr></thead>
+            <tbody>
+                {% for m in machines_panne %}
+                <tr><td>{{ m.id }}</td><td>{{ m.nom }}</td><td><span class="badge badge-{{ m.statut }}">{{ m.statut }}</span></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ALERTES STOCK -->
+    {% if alertes %}
+    <div class="card">
+        <h2>⚠️ Consommables en alerte</h2>
+        <table class="data-table">
+            <thead><tr><th>Désignation</th><th>Stock</th><th>Minimum</th></tr></thead>
+            <tbody>
+                {% for a in alertes %}
+                <tr class="alert-row"><td>{{ a.designation }}</td><td>{{ a.quantite_stock }}</td><td>{{ a.stock_minimum }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- MES SEANCES -->
+    <div class="card">
+        <h2>📝 Mes séances TP</h2>
+        <a href="{{ url_for('creer_seance_tp') }}" class="btn-add">➕ Créer une séance</a>
+        <table class="data-table">
+            <thead><tr><th>Titre</th><th>Date</th><th>Heure</th><th>Inscrits</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for s in seances %}
+                <tr>
+                    <td>{{ s.titre }}</td>
+                    <td>{{ s.date_seance }}</td>
+                    <td>{{ s.heure_debut }} - {{ s.heure_fin }}</td>
+                    <td>{{ s.nb_inscrits }}</td>
+                    <td><a href="{{ url_for('voir_inscriptions', seance_id=s.id) }}" class="btn-view">👁️ Voir</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- TP EN COURS -->
+    {% if tp_en_cours %}
+    <div class="card">
+        <h2>🟢 TP en cours</h2>
+        <table class="data-table">
+            <thead><tr><th>Étudiant</th><th>Machine</th><th>Séance</th><th>Début</th><th>Action</th></tr></thead>
+            <tbody>
+                {% for t in tp_en_cours %}
+                <tr>
+                    <td>{{ t.etudiant_nom }}</td>
+                    <td>{{ t.machine_nom }}</td>
+                    <td>{{ t.seance_titre }}</td>
+                    <td>{{ t.date_debut }}</td>
+                    <td><a href="{{ url_for('suspendre_utilisation', suivi_id=t.id) }}" class="btn-suspendre">⏸️ Suspendre</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

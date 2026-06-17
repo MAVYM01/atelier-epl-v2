@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atelier Mécanique EPL - {% block title %}{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <!-- Barre de navigation -->
+    {% if current_user.is_authenticated %}
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='images/logo_epl.png') }}" alt="EPL Logo" class="logo-img">
+                <span class="logo-text">Atelier Mécanique EPL</span>
+                <span class="version-badge">v1.0 - 062026</span>
+            </div>
+            <div class="nav-links">
+                {% if current_user.role == 'admin' %}
+                    <a href="{{ url_for('admin_dashboard') }}" class="nav-link">📊 Dashboard</a>
+                    <a href="{{ url_for('admin_dashboard') }}#machines" class="nav-link">🛠️ Machines</a>
+                    <a href="{{ url_for('admin_dashboard') }}#stocks" class="nav-link">📦 Stocks</a>
+                    <a href="{{ url_for('admin_dashboard') }}#users" class="nav-link">👥 Utilisateurs</a>
+                {% elif current_user.role == 'enseignant' %}
+                    <a href="{{ url_for('enseignant_dashboard') }}" class="nav-link">📊 Dashboard</a>
+                    <a href="{{ url_for('creer_seance_tp') }}" class="nav-link">📝 Créer TP</a>
+                {% elif current_user.role == 'magasinier' %}
+                    <a href="{{ url_for('magasinier_dashboard') }}" class="nav-link">📊 Dashboard</a>
+                {% elif current_user.role == 'etudiant' %}
+                    <a href="{{ url_for('etudiant_dashboard') }}" class="nav-link">📊 Dashboard</a>
+                {% endif %}
+                <a href="{{ url_for('export_pdf') }}" class="nav-link">📑 Rapport PDF</a>
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ current_user.nom_complet }}</span>
+                <span class="user-role">{{ current_user.role|capitalize }}</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <!-- Messages Flash -->
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2026 École Polytechnique de Lomé - Atelier Mécanique v1.0</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Validation en attente{% endblock %}
+{% block content %}
+<div class="validation-container">
+    <div class="validation-card">
+        <div class="validation-icon">⏳</div>
+        <h1>Compte en attente de validation</h1>
+        <p>Votre compte a été créé avec succès.</p>
+        <p>Un administrateur doit valider votre inscription avant de pouvoir accéder à l'application.</p>
+        <p>Vous serez notifié par email dès que votre compte sera actif.</p>
+        <a href="{{ url_for('logout') }}" class="btn-logout">Se déconnecter</a>
+    </div>
+</div>
+{% endblock %}

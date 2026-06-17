@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Inscriptions - {{ seance.titre }}{% endblock %}
+{% block content %}
+<div class="card">
+    <h1>📋 Inscriptions - {{ seance.titre }}</h1>
+    <p><strong>Date :</strong> {{ seance.date_seance }}</p>
+    <p><strong>Heure :</strong> {{ seance.heure_debut }} - {{ seance.heure_fin }}</p>
+    
+    <h3>Étudiants inscrits ({{ inscriptions|length }})</h3>
+    <table class="data-table">
+        <thead><tr><th>Nom</th><th>Email</th><th>Date d'inscription</th></tr></thead>
+        <tbody>
+            {% for i in inscriptions %}
+            <tr>
+                <td>{{ i.nom_complet }}</td>
+                <td>{{ i.email }}</td>
+                <td>{{ i.date_inscription }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>Suivi des TP</h3>
+    <table class="data-table">
+        <thead><tr><th>Étudiant</th><th>Machine</th><th>Début</th><th>Fin</th><th>Statut</th></tr></thead>
+        <tbody>
+            {% for s in suivis %}
+            <tr>
+                <td>{{ s.etudiant_nom }}</td>
+                <td>{{ s.machine_nom }}</td>
+                <td>{{ s.date_debut }}</td>
+                <td>{{ s.date_fin or '-' }}</td>
+                <td><span class="badge badge-{{ s.statut }}">{{ s.statut }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <a href="{{ url_for('enseignant_dashboard') }}" class="btn-back">← Retour</a>
+</div>
+{% endblock %}

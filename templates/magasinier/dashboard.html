@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Magasinier{% endblock %}
+{% block content %}
+<div class="dashboard">
+    <h1>📦 Tableau de bord - Magasinier</h1>
+
+    <!-- FORMULAIRE DE MOUVEMENT -->
+    <div class="card">
+        <h2>➕ Enregistrer un mouvement</h2>
+        <form method="POST" action="{{ url_for('magasinier_mouvement') }}" class="form-row">
+            <div class="form-group">
+                <select name="consommable_id" required>
+                    <option value="">Choisir...</option>
+                    {% for c in consommables %}
+                    <option value="{{ c.id }}">{{ c.designation }} ({{ c.quantite_stock }} {{ c.unite }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <select name="type_mouvement" required>
+                    <option value="entree">📥 Entrée</option>
+                    <option value="sortie">📤 Sortie</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <input type="number" name="quantite" placeholder="Quantité" required>
+            </div>
+            <div class="form-group">
+                <input type="text" name="commentaire" placeholder="Commentaire (optionnel)">
+            </div>
+            <button type="submit" class="btn-submit">✅ Enregistrer</button>
+        </form>
+    </div>
+
+    <!-- ÉTAT DES STOCKS -->
+    <div class="card">
+        <h2>📋 État des stocks</h2>
+        <table class="data-table">
+            <thead><tr><th>Réf.</th><th>Désignation</th><th>Stock</th><th>Min</th><th>Statut</th></tr></thead>
+            <tbody>
+                {% for c in consommables %}
+                <tr class="{% if c.quantite_stock <= c.stock_minimum %}alert-row{% endif %}">
+                    <td>{{ c.reference }}</td>
+                    <td>{{ c.designation }}</td>
+                    <td><strong>{{ c.quantite_stock }}</strong> {{ c.unite }}</td>
+                    <td>{{ c.stock_minimum }}</td>
+                    <td>
+                        {% if c.quantite_stock <= c.stock_minimum %}
+                            <span class="badge badge-danger">⚠️ ALERTE</span>
+                        {% else %}
+                            <span class="badge badge-success">✅ OK</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- TP PRÉVISIONNELS -->
+    <div class="card">
+        <h2>📅 TP prévisionnels</h2>
+        <table class="data-table">
+            <thead><tr><th>Titre</th><th>Enseignant</th><th>Date</th><th>Étudiants</th></tr></thead>
+            <tbody>
+                {% for t in tp_previsionnels %}
+                <tr>
+                    <td>{{ t.titre }}</td>
+                    <td>{{ t.enseignant_nom }}</td>
+                    <td>{{ t.date_seance }}</td>
+                    <td>{{ t.nb_etudiants }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- HISTORIQUE -->
+    <div class="card">
+        <h2>📜 Historique des mouvements</h2>
+        <table class="data-table">
+            <thead><tr><th>Date</th><th>Article</th><th>Type</th><th>Qté</th><th>Opérateur</th></tr></thead>
+            <tbody>
+                {% for m in mouvements %}
+                <tr>
+                    <td>{{ m.date_heure }}</td>
+                    <td>{{ m.designation }}</td>
+                    <td>{{ m.type_action }}</td>
+                    <td><strong>{{ m.quantite }}</strong></td>
+                    <td>{{ m.nom_complet }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
