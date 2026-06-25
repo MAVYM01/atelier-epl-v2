@@ -58,6 +58,53 @@
         {% endif %}
     </div>
 
+    <!-- TOUS LES UTILISATEURS -->
+    <div class="card">
+        <h2>👥 Tous les utilisateurs</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Email</th>
+                    <th>Rôle</th>
+                    <th>Statut</th>
+                    <th>Dernière connexion</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in tous_utilisateurs %}
+                <tr>
+                    <td>{{ u.nom_complet }}</td>
+                    <td>
+                        {% if current_user.role == 'admin' %}
+                            {{ u.email }}
+                        {% else %}
+                            <span class="hidden-email">● ● ● ● @ ● ● ●</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.role == 'admin' %}👑 Admin
+                        {% elif u.role == 'enseignant' %}👨‍🏫 Enseignant
+                        {% elif u.role == 'magasinier' %}📦 Magasinier
+                        {% else %}🎓 Étudiant{% endif %}
+                    </td>
+                    <td>
+                        {% if u.est_actif %}
+                            <span class="badge badge-success">✅ Actif</span>
+                        {% else %}
+                            <span class="badge badge-danger">❌ Inactif</span>
+                        {% endif %}
+                        {% if not u.est_verifie %}
+                            <span class="badge badge-warning">⏳ En attente</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ u.derniere_connexion or 'Jamais' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+</div>
+
         <!-- GESTION MACHINES -->
     <div class="card" id="machines">
         <h2>🛠️ Gestion des machines</h2>
