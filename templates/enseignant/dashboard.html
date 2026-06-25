@@ -10,14 +10,32 @@
         <div class="stat-mini warning"><div>⚠️</div><div>{{ alertes|length }}</div><div>Alertes stock</div></div>
     </div>
 
-    <!-- MACHINES -->
+        <!-- MACHINES -->
     <div class="card">
         <h2>🛠️ Machines disponibles</h2>
         <table class="data-table">
-            <thead><tr><th>ID</th><th>Nom</th><th>Statut</th><th>Heures</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nom</th>
+                    <th>Statut</th>
+                    <th>Heures</th>
+                    <th>Action</th>  <!-- ← NOUVEAU -->
+                </tr>
+            </thead>
             <tbody>
                 {% for m in machines_ok %}
-                <tr><td>{{ m.id }}</td><td>{{ m.nom }}</td><td><span class="badge badge-operationnel">✅ Opérationnel</span></td><td>{{ m.compteur_heures }}</td></tr>
+                <tr>
+                    <td>{{ m.id }}</td>
+                    <td>{{ m.nom }}</td>
+                    <td><span class="badge badge-operationnel">✅ Opérationnel</span></td>
+                    <td>{{ m.compteur_heures }}</td>
+                    <td>
+                        <a href="{{ url_for('declarer_panne', machine_id=m.id) }}" 
+                        class="btn-panne" 
+                        onclick="return confirm('Déclarer cette machine en panne ?')">⚠️ Panne</a>
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -90,5 +108,45 @@
         </table>
     </div>
     {% endif %}
-</div>
+
+    <!-- ============ RÉSERVATIONS DES ÉTUDIANTS (NOUVEAU) ============ -->
+    <div class="card">
+        <h2>📋 Réservations des étudiants</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Étudiant</th>
+                    <th>Machine</th>
+                    <th>Date</th>
+                    <th>Heure</th>
+                    <th>Type</th>
+                    <th>Groupe</th>
+                    <th>UE/Projet</th>
+                    <th>Commentaire</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reservations_etudiants %}
+                <tr>
+                    <td>{{ r.etudiant_nom }}</td>
+                    <td>{{ r.machine_nom }}</td>
+                    <td>{{ r.date_reservation }}</td>
+                    <td>{{ r.heure_debut }} - {{ r.heure_fin }}</td>
+                    <td>
+                        {% if r.type_reservation == 'TP' %}
+                            <span class="badge badge-info">📚 TP encadré</span>
+                        {% elif r.type_reservation == 'PERSO' %}
+                            <span class="badge badge-warning">🔬 TP personnel</span>
+                        {% else %}
+                            <span class="badge badge-success">🎯 Libre</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ r.membres_groupe or '-' }}</td>
+                    <td>{{ r.ue_projet or '-' }}</td>
+                    <td>{{ r.commentaire or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 {% endblock %}

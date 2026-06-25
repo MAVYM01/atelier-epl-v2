@@ -32,7 +32,12 @@ app.secret_key = 'epl_lome_2026_secret_key_professionnel'
 
 # Configuration base de données
 DATABASE = os.path.join(os.path.dirname(__file__), 'database.db')
-
+# Configuration Flask-Mail (AJOUT)
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'victorienattila@gmail.com'  # À remplacer par votre email
+app.config['MAIL_PASSWORD'] = 'iksd xptn rigf kwqi'  # À remplacer par votre mot de passe
 def get_db():
     """Retourne une connexion à la base SQLite"""
     conn = sqlite3.connect(DATABASE)
@@ -134,11 +139,26 @@ def init_db():
             heure_debut TIME,
             heure_fin TIME,
             membres_groupe TEXT,
+            type_reservation TEXT DEFAULT 'libre',
+            ue_projet TEXT,
+            commentaire TEXT,
             statut TEXT DEFAULT 'active',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE,
             FOREIGN KEY (etudiant_id) REFERENCES utilisateurs(id) ON DELETE CASCADE,
             FOREIGN KEY (seance_id) REFERENCES seances_tp(id) ON DELETE SET NULL
+        )
+    ''')
+
+    #connexion
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS connexions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            utilisateur_id INTEGER,
+            date_heure DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ip_address TEXT,
+            user_agent TEXT,
+            FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id) ON DELETE CASCADE
         )
     ''')
     
@@ -173,6 +193,8 @@ def init_db():
             FOREIGN KEY (consommable_id) REFERENCES consommables(id) ON DELETE SET NULL
         )
     ''')
+
+
     
     # === INSERTION ADMIN PAR DEFAUT ===
     cur.execute("SELECT id FROM utilisateurs WHERE email = 'admin@epl.tg'")
@@ -223,6 +245,21 @@ def init_db():
     db.close()
     print("✅ Base de données initialisée avec succès")
 
+
+from flask_mail import Mail, Message
+
+mail = Mail(app)
+
+def envoyer_email(destinataire, sujet, corps):
+    """Envoie un email à un destinataire"""
+    try:
+        msg = Message(sujet, sender=app.config['MAIL_USERNAME'], recipients=[destinataire])
+        msg.body = corps
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"❌ Erreur d'envoi d'email: {e}")
+        return False
 # ==================== LOGIN MANAGER ====================
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -465,10 +502,39 @@ def admin_dashboard():
 def admin_valider_inscription(user_id):
     db = get_db()
     cur = db.cursor()
-    cur.execute("UPDATE utilisateurs SET est_verifie = 1 WHERE id = ?", (user_id,))
-    db.commit()
+    
+    # Récupérer l'utilisateur
+    cur.execute("SELECT email, nom_complet FROM utilisateurs WHERE id = ?", (user_id,))
+    user = cur.fetchone()
+    
+    if user:
+        # Valider l'inscription
+        cur.execute("UPDATE utilisateurs SET est_verifie = 1 WHERE id = ?", (user_id,))
+        db.commit()
+        
+        # Envoyer l'email de validation
+        sujet = "✅ Votre compte Atelier EPL est validé"
+        corps = f"""
+            Bonjour {user['nom_complet']},
+
+            Votre compte sur l'application Atelier Mécanique de l'EPL a été validé par l'administrateur.
+
+            Vous pouvez maintenant vous connecter à l'adresse suivante :
+            https://mavym.pythonanywhere.com
+
+            Identifiants :
+            - Email : {user['email']}
+            - Mot de passe : celui que vous avez choisi lors de votre inscription
+
+            Cordialement,
+            L'équipe Atelier Mécanique EPL
+        """
+        envoyer_email(user['email'], sujet, corps)
+        flash('✅ Inscription validée et email envoyé', 'success')
+    else:
+        flash('❌ Utilisateur non trouvé', 'danger')
+    
     db.close()
-    flash('✅ Inscription validée', 'success')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/refuser-inscription/<int:user_id>')
@@ -647,6 +713,21 @@ def enseignant_dashboard():
     """, (current_user.id,))
     tp_en_cours = cur.fetchall()
     
+    # NOUVEAU : Récupérer les réservations des étudiants
+    cur.execute("""
+        SELECT r.*, u.nom_complet as etudiant_nom, m.nom as machine_nom,
+               s.titre as seance_titre
+        FROM reservations_machine r
+        JOIN utilisateurs u ON r.etudiant_id = u.id
+        JOIN machines m ON r.machine_id = m.id
+        LEFT JOIN seances_tp s ON r.seance_id = s.id
+        WHERE r.statut = 'active'
+        AND (r.seance_id IN (SELECT id FROM seances_tp WHERE enseignant_id = ?)
+             OR r.seance_id IS NULL)
+        ORDER BY r.date_reservation ASC
+    """, (current_user.id,))
+    reservations_etudiants = cur.fetchall()
+    
     db.close()
     
     return render_template('enseignant/dashboard.html',
@@ -654,8 +735,8 @@ def enseignant_dashboard():
                          machines_panne=machines_panne,
                          alertes=alertes,
                          seances=seances,
-                         tp_en_cours=tp_en_cours)
-
+                         tp_en_cours=tp_en_cours,
+                         reservations_etudiants=reservations_etudiants)  # ← NOUVEAU
 @app.route('/enseignant/seance/creer', methods=['GET', 'POST'])
 @login_required
 @roles_requis('enseignant')
@@ -914,11 +995,15 @@ def reserver_machine():
     heure_debut = request.form['heure_debut']
     heure_fin = request.form['heure_fin']
     membres_groupe = request.form.get('membres_groupe', '')
+    type_reservation = request.form.get('type_reservation', 'LIBRE')
+    ue_projet = request.form.get('ue_projet', '')
+    commentaire = request.form.get('commentaire', '')
     seance_id = request.form.get('seance_id', None)
     
     db = get_db()
     cur = db.cursor()
     
+    # Vérifier les conflits
     cur.execute("""
         SELECT COUNT(*) as count FROM reservations_machine
         WHERE machine_id = ? AND date_reservation = ?
@@ -931,20 +1016,15 @@ def reserver_machine():
     if conflit > 0:
         flash('❌ Machine déjà réservée sur ce créneau', 'danger')
     else:
-        if seance_id and seance_id != '':
-            cur.execute("""
-                INSERT INTO reservations_machine (machine_id, etudiant_id, seance_id, date_reservation, 
-                                                 heure_debut, heure_fin, membres_groupe)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (machine_id, current_user.id, seance_id, date_reservation, 
-                  heure_debut, heure_fin, membres_groupe))
-        else:
-            cur.execute("""
-                INSERT INTO reservations_machine (machine_id, etudiant_id, date_reservation, 
-                                                 heure_debut, heure_fin, membres_groupe)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (machine_id, current_user.id, date_reservation, 
-                  heure_debut, heure_fin, membres_groupe))
+        cur.execute("""
+            INSERT INTO reservations_machine 
+            (machine_id, etudiant_id, seance_id, date_reservation, 
+             heure_debut, heure_fin, membres_groupe, type_reservation, 
+             ue_projet, commentaire)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (machine_id, current_user.id, seance_id, date_reservation, 
+              heure_debut, heure_fin, membres_groupe, type_reservation, 
+              ue_projet, commentaire))
         db.commit()
         flash('✅ Machine réservée avec succès', 'success')
     
@@ -1022,6 +1102,116 @@ def annuler_reservation(reservation_id):
     flash('❌ Réservation annulée', 'info')
     return redirect(url_for('etudiant_dashboard'))
 
+@app.route('/etudiant/action', methods=['POST'])
+@login_required
+@roles_requis('etudiant', 'enseignant', 'admin')
+def etudiant_action():
+    machine_id = request.form['machine_id']
+    action = request.form['action']
+    
+    db = get_db()
+    cur = db.cursor()
+    
+    # Vérifier que la machine existe
+    cur.execute("SELECT id, nom FROM machines WHERE id = ?", (machine_id,))
+    machine = cur.fetchone()
+    if not machine:
+        flash('❌ Machine non trouvée', 'danger')
+        db.close()
+        return redirect(url_for('etudiant_dashboard'))
+    
+    # VÉRIFICATION : Pour "debut_tp", vérifier la date et la réservation
+    if action == 'debut_tp':
+        # Vérifier si l'étudiant a une réservation active pour cette machine aujourd'hui
+        cur.execute("""
+            SELECT * FROM reservations_machine 
+            WHERE machine_id = ? 
+            AND etudiant_id = ? 
+            AND date_reservation = DATE('now')
+            AND statut = 'active'
+        """, (machine_id, current_user.id))
+        reservation = cur.fetchone()
+        
+        if not reservation:
+            flash('❌ Vous devez avoir une réservation active pour cette machine aujourd\'hui', 'danger')
+            db.close()
+            return redirect(url_for('etudiant_dashboard'))
+        
+        # Vérifier que l'heure actuelle est dans le créneau de réservation
+        from datetime import datetime
+        now = datetime.now().time()
+        heure_debut = datetime.strptime(reservation['heure_debut'], '%H:%M').time()
+        heure_fin = datetime.strptime(reservation['heure_fin'], '%H:%M').time()
+        
+        if now < heure_debut or now > heure_fin:
+            flash(f'❌ Vous ne pouvez démarrer qu\'entre {reservation["heure_debut"]} et {reservation["heure_fin"]}', 'danger')
+            db.close()
+            return redirect(url_for('etudiant_dashboard'))
+    
+    # Exécuter l'action (début_tp, fin_tp, panne)
+    if action == 'debut_tp':
+        cur.execute("""
+            INSERT INTO transactions (utilisateur_id, machine_id, type_action, commentaire)
+            VALUES (?, ?, 'debut_tp', 'Début des travaux pratiques')
+        """, (current_user.id, machine_id))
+        flash('🟢 TP commencé', 'success')
+    
+    elif action == 'fin_tp':
+        cur.execute("""
+            INSERT INTO transactions (utilisateur_id, machine_id, type_action, commentaire)
+            VALUES (?, ?, 'fin_tp', 'Fin des travaux pratiques')
+        """, (current_user.id, machine_id))
+        cur.execute("UPDATE machines SET compteur_heures = compteur_heures + 2 WHERE id = ?", (machine_id,))
+        flash('🔴 TP terminé - 2h ajoutées', 'success')
+    
+    elif action == 'panne':
+        cur.execute("""
+            INSERT INTO transactions (utilisateur_id, machine_id, type_action, commentaire)
+            VALUES (?, ?, 'declaration_panne', 'Panne déclarée')
+        """, (current_user.id, machine_id))
+        cur.execute("UPDATE machines SET statut = 'panne' WHERE id = ?", (machine_id,))
+        flash('⚠️ Panne déclarée', 'warning')
+    
+    db.commit()
+    db.close()
+    
+    return redirect(url_for('etudiant_dashboard'))
+
+# ==================== DECLARER UNE PANNE ====================
+@app.route('/declarer-panne/<machine_id>')
+@login_required
+def declarer_panne(machine_id):
+    """Permet à un enseignant ou un étudiant de déclarer une panne sur une machine"""
+    # Vérifier que l'utilisateur a le droit (enseignant, etudiant, admin)
+    if current_user.role not in ['enseignant', 'etudiant', 'admin']:
+        flash('❌ Accès non autorisé', 'danger')
+        return redirect(url_for('dashboard_router'))
+    
+    db = get_db()
+    cur = db.cursor()
+    
+    # Vérifier que la machine existe
+    cur.execute("SELECT id, nom FROM machines WHERE id = ?", (machine_id,))
+    machine = cur.fetchone()
+    if not machine:
+        db.close()
+        flash('❌ Machine non trouvée', 'danger')
+        return redirect(url_for('dashboard_router'))
+    
+    # Mettre à jour le statut de la machine
+    cur.execute("UPDATE machines SET statut = 'panne' WHERE id = ?", (machine_id,))
+    
+    # Enregistrer la transaction
+    cur.execute("""
+        INSERT INTO transactions (utilisateur_id, machine_id, type_action, commentaire)
+        VALUES (?, ?, 'declaration_panne', ?)
+    """, (current_user.id, machine_id, f"Panne déclarée par {current_user.nom_complet}"))
+    
+    db.commit()
+    db.close()
+    
+    flash(f'⚠️ Machine "{machine["nom"]}" déclarée en panne', 'warning')
+    return redirect(request.referrer or url_for('dashboard_router'))
 # ==================== PAGE PUBLIQUE QR CODE ====================
 @app.route('/machine/<machine_id>')
 def machine_publique(machine_id):
@@ -1066,55 +1256,250 @@ def export_pdf():
     db = get_db()
     cur = db.cursor()
     
-    # Machines
-    cur.execute("SELECT id, nom, statut, compteur_heures, puissance_elec FROM machines")
-    machines = cur.fetchall()
-    
-    data_machines = [['ID', 'Nom', 'Statut', 'Heures', 'Puissance']]
-    statut_fr = {'operationnel': 'Opérationnel', 'panne': 'En panne', 
-                 'reparation': 'En réparation', 'irreparable': 'Irréparable'}
-    for m in machines:
-        data_machines.append([m['id'], m['nom'], statut_fr.get(m['statut'], m['statut']), 
-                              str(m['compteur_heures']), f"{m['puissance_elec']} kW"])
-    
-    table_machines = Table(data_machines, colWidths=[1.2*inch, 1.5*inch, 1.2*inch, 1*inch, 1*inch])
-    table_machines.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1a365d')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('GRID', (0,0), (-1,-1), 1, colors.black),
-    ]))
-    elements.append(Paragraph("📊 État du parc machine", styles['Heading2']))
-    elements.append(Spacer(1, 0.2*inch))
-    elements.append(table_machines)
-    elements.append(Spacer(1, 0.3*inch))
-    
-    # Alertes stock
-    cur.execute("SELECT designation, quantite_stock, stock_minimum FROM consommables WHERE quantite_stock <= stock_minimum")
-    alertes = cur.fetchall()
-    
-    if alertes:
-        data_alertes = [['Désignation', 'Stock actuel', 'Stock minimum', 'Urgence']]
-        for a in alertes:
-            data_alertes.append([a['designation'], str(a['quantite_stock']), str(a['stock_minimum']), '⚠️ CRITIQUE'])
+    # ============ ADMIN ============
+    if current_user.role == 'admin':
+        elements.append(Paragraph("📊 Rapport complet - Administration", styles['Heading2']))
+        elements.append(Spacer(1, 0.2*inch))
         
-        table_alertes = Table(data_alertes, colWidths=[2.5*inch, 1.2*inch, 1.2*inch, 1.2*inch])
-        table_alertes.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.red),
+        # Machines
+        cur.execute("SELECT id, nom, statut, compteur_heures, puissance_elec FROM machines")
+        machines = cur.fetchall()
+        
+        data_machines = [['ID', 'Nom', 'Statut', 'Heures', 'Puissance']]
+        statut_fr = {'operationnel': 'Opérationnel', 'panne': 'En panne', 
+                     'reparation': 'En réparation', 'irreparable': 'Irréparable'}
+        for m in machines:
+            data_machines.append([m['id'], m['nom'], statut_fr.get(m['statut'], m['statut']), 
+                                  str(m['compteur_heures']), f"{m['puissance_elec']} kW"])
+        
+        table_machines = Table(data_machines, colWidths=[1.2*inch, 1.5*inch, 1.2*inch, 1*inch, 1*inch])
+        table_machines.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1a365d')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('GRID', (0,0), (-1,-1), 1, colors.black),
         ]))
-        elements.append(Paragraph("⚠️ Consommables en alerte", styles['Heading2']))
+        elements.append(Paragraph("🛠️ État du parc machine", styles['Heading3']))
         elements.append(Spacer(1, 0.2*inch))
-        elements.append(table_alertes)
+        elements.append(table_machines)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Consommables
+        cur.execute("SELECT designation, quantite_stock, stock_minimum FROM consommables")
+        consommables = cur.fetchall()
+        data_consommables = [['Désignation', 'Stock', 'Minimum']]
+        for c in consommables:
+            data_consommables.append([c['designation'], str(c['quantite_stock']), str(c['stock_minimum'])])
+        
+        table_consommables = Table(data_consommables, colWidths=[2.5*inch, 1*inch, 1*inch])
+        table_consommables.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1a365d')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ]))
+        elements.append(Paragraph("📦 État des stocks", styles['Heading3']))
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(table_consommables)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Utilisateurs
+        cur.execute("SELECT username, nom_complet, role, derniere_connexion FROM utilisateurs")
+        users = cur.fetchall()
+        data_users = [['Nom', 'Rôle', 'Dernière connexion']]
+        for u in users:
+            data_users.append([u['nom_complet'], u['role'], u['derniere_connexion'] or 'Jamais'])
+        
+        table_users = Table(data_users, colWidths=[2*inch, 1.2*inch, 1.5*inch])
+        table_users.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1a365d')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ]))
+        elements.append(Paragraph("👥 Utilisateurs", styles['Heading3']))
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(table_users)
+    
+    # ============ ENSEIGNANT ============
+    elif current_user.role == 'enseignant':
+        elements.append(Paragraph("📊 Rapport - Enseignant", styles['Heading2']))
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Machines OK
+        cur.execute("SELECT id, nom, statut, compteur_heures FROM machines WHERE statut = 'operationnel'")
+        machines_ok = cur.fetchall()
+        data_ok = [['ID', 'Nom', 'Heures']]
+        for m in machines_ok:
+            data_ok.append([m['id'], m['nom'], str(m['compteur_heures'])])
+        
+        table_ok = Table(data_ok, colWidths=[1.2*inch, 1.5*inch, 1*inch])
+        table_ok.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#38a169')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ]))
+        elements.append(Paragraph("✅ Machines opérationnelles", styles['Heading3']))
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(table_ok)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Machines en panne
+        cur.execute("SELECT id, nom, statut FROM machines WHERE statut IN ('panne', 'reparation')")
+        machines_panne = cur.fetchall()
+        data_panne = [['ID', 'Nom', 'Statut']]
+        for m in machines_panne:
+            data_panne.append([m['id'], m['nom'], m['statut']])
+        
+        table_panne = Table(data_panne, colWidths=[1.2*inch, 1.5*inch, 1*inch])
+        table_panne.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e53e3e')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ]))
+        elements.append(Paragraph("🔴 Machines en panne", styles['Heading3']))
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(table_panne)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Alertes stock
+        cur.execute("SELECT designation, quantite_stock, stock_minimum FROM consommables WHERE quantite_stock <= stock_minimum")
+        alertes = cur.fetchall()
+        if alertes:
+            data_alertes = [['Désignation', 'Stock', 'Minimum']]
+            for a in alertes:
+                data_alertes.append([a['designation'], str(a['quantite_stock']), str(a['stock_minimum'])])
+            
+            table_alertes = Table(data_alertes, colWidths=[2.5*inch, 1*inch, 1*inch])
+            table_alertes.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#ed8936')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('GRID', (0,0), (-1,-1), 1, colors.black),
+            ]))
+            elements.append(Paragraph("⚠️ Alertes stock", styles['Heading3']))
+            elements.append(Spacer(1, 0.2*inch))
+            elements.append(table_alertes)
+    
+    # ============ MAGASINIER ============
+    elif current_user.role == 'magasinier':
+        elements.append(Paragraph("📊 Rapport - Magasinier", styles['Heading2']))
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Tous les stocks
+        cur.execute("SELECT designation, quantite_stock, stock_minimum FROM consommables ORDER BY quantite_stock ASC")
+        stocks = cur.fetchall()
+        data_stocks = [['Désignation', 'Stock', 'Minimum']]
+        for s in stocks:
+            data_stocks.append([s['designation'], str(s['quantite_stock']), str(s['stock_minimum'])])
+        
+        table_stocks = Table(data_stocks, colWidths=[2.5*inch, 1*inch, 1*inch])
+        table_stocks.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1a365d')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ]))
+        elements.append(Paragraph("📦 État des stocks", styles['Heading3']))
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(table_stocks)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # TP prévisionnels
+        cur.execute("""
+            SELECT s.titre, s.date_seance, u.nom_complet as enseignant_nom
+            FROM seances_tp s
+            JOIN utilisateurs u ON s.enseignant_id = u.id
+            WHERE s.date_seance >= DATE('now')
+            ORDER BY s.date_seance ASC
+            LIMIT 10
+        """)
+        tp_previsionnels = cur.fetchall()
+        data_tp = [['Titre', 'Date', 'Enseignant']]
+        for t in tp_previsionnels:
+            data_tp.append([t['titre'], t['date_seance'], t['enseignant_nom']])
+        
+        table_tp = Table(data_tp, colWidths=[2*inch, 1.2*inch, 1.5*inch])
+        table_tp.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1a365d')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ]))
+        elements.append(Paragraph("📅 TP prévisionnels", styles['Heading3']))
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(table_tp)
+    
+    # ============ ÉTUDIANT ============
+    else:
+        elements.append(Paragraph("📊 Mon historique - Étudiant", styles['Heading2']))
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Mon historique
+        cur.execute("""
+            SELECT t.date_heure, m.nom as machine_nom, t.type_action
+            FROM transactions t
+            LEFT JOIN machines m ON t.machine_id = m.id
+            WHERE t.utilisateur_id = ?
+            ORDER BY t.date_heure DESC
+            LIMIT 30
+        """, (current_user.id,))
+        historique = cur.fetchall()
+        data_hist = [['Date', 'Machine', 'Action']]
+        for h in historique:
+            data_hist.append([h['date_heure'], h['machine_nom'] or '-', h['type_action']])
+        
+        table_hist = Table(data_hist, colWidths=[1.5*inch, 1.5*inch, 1.2*inch])
+        table_hist.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1a365d')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ]))
+        elements.append(Paragraph("📜 Mes dernières activités", styles['Heading3']))
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(table_hist)
     
     db.close()
     doc.build(elements)
     buffer.seek(0)
     
     return send_file(buffer, mimetype='application/pdf', as_attachment=True, 
-                     download_name=f"rapport_atelier_{datetime.now().strftime('%Y%m%d')}.pdf")
-
+                     download_name=f"rapport_{datetime.now().strftime('%Y%m%d')}.pdf")
+# ==================== API POUR STATISTIQUES ====================
+@app.route('/api/stats')
+@login_required
+def api_stats():
+    db = get_db()
+    cur = db.cursor()
+    
+    # Statut des machines
+    cur.execute("""
+        SELECT statut, COUNT(*) as total
+        FROM machines
+        GROUP BY statut
+    """)
+    statuts = cur.fetchall()
+    
+    # Top machines utilisées
+    cur.execute("""
+        SELECT m.nom, COUNT(t.id) as utilisations
+        FROM machines m
+        LEFT JOIN transactions t ON m.id = t.machine_id
+        GROUP BY m.id
+        ORDER BY utilisations DESC
+        LIMIT 5
+    """)
+    top_machines = cur.fetchall()
+    
+    db.close()
+    
+    return jsonify({
+        'statuts': [dict(row) for row in statuts],
+        'top_machines': [dict(row) for row in top_machines]
+    })
 # ==================== LANCEMENT ====================
 if __name__ == '__main__':
     os.makedirs('qrcodes', exist_ok=True)

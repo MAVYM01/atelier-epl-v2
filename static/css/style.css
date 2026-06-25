@@ -418,3 +418,22 @@ body {
     .stats-grid { grid-template-columns: 1fr; }
     .stats-mini { grid-template-columns: 1fr 1fr; }
 }
+.btn-panne {
+    background: #e53e3e;
+    color: white;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: none;
+    display: inline-block;
+}
+.btn-panne:hover {
+    background: #c53030;
+}
+.hidden-email {
+    color: #a0aec0;
+    font-family: monospace;
+    letter-spacing: 2px;
+}

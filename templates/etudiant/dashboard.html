@@ -58,6 +58,11 @@
                     <td><span class="badge badge-operationnel">✅ Opérationnel</span></td>
                     <td>
                         <button onclick="reserverMachine('{{ m.id }}')" class="btn-submit">📅 Réserver</button>
+                        <a 
+                        href="{{ url_for('declarer_panne', machine_id=m.id) }}" 
+                        class="btn-panne" 
+                        onclick="return confirm('Déclarer cette machine en panne ?')">⚠️ Panne
+                        </a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -65,17 +70,36 @@
         </table>
     </div>
 
+   
     <!-- MES RÉSERVATIONS -->
     <div class="card">
         <h2>📅 Mes réservations</h2>
         <table class="data-table">
-            <thead><tr><th>Machine</th><th>Date</th><th>Heure</th><th>Statut</th><th>Actions</th></tr></thead>
+            <thead><tr>
+                <th>Machine</th>
+                <th>Date</th>
+                <th>Heure</th>
+                <th>Type</th>
+                <th>Groupe</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr></thead>
             <tbody>
                 {% for r in mes_reservations %}
                 <tr>
                     <td>{{ r.machine_nom }}</td>
                     <td>{{ r.date_reservation }}</td>
                     <td>{{ r.heure_debut }} - {{ r.heure_fin }}</td>
+                    <td>
+                        {% if r.type_reservation == 'TP' %}
+                            <span class="badge badge-info">📚 TP encadré</span>
+                        {% elif r.type_reservation == 'PERSO' %}
+                            <span class="badge badge-warning">🔬 TP personnel</span>
+                        {% else %}
+                            <span class="badge badge-success">🎯 Libre</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ r.membres_groupe or '-' }}</td>
                     <td><span class="badge badge-{{ r.statut }}">{{ r.statut }}</span></td>
                     <td>
                         <a href="{{ url_for('debuter_tp_reservation', reservation_id=r.id) }}" class="btn-start">🟢 Démarrer</a>
@@ -107,14 +131,50 @@
 
 <script>
 function reserverMachine(machineId) {
+    // Demander le type de réservation
+    const typeReservation = prompt(
+        "Type de réservation :\n" +
+        "1 - TP encadré (séance TP)\n" +
+        "2 - TP personnel (UE/Projet)\n" +
+        "3 - Utilisation libre\n\n" +
+        "Entrez le numéro (1, 2 ou 3) :"
+    );
+    
+    if (!typeReservation) return;
+    
+    let type = '';
+    let seanceId = '';
+    let ueProjet = '';
+    
+    if (typeReservation === '1') {
+        type = 'TP';
+        seanceId = prompt("Entrez l'ID de la séance TP (ex: 1) :");
+        if (!seanceId) return;
+    } else if (typeReservation === '2') {
+        type = 'PERSO';
+        ueProjet = prompt("Entrez l'UE ou le projet concerné :");
+        if (!ueProjet) return;
+    } else if (typeReservation === '3') {
+        type = 'LIBRE';
+    } else {
+        alert('❌ Choix invalide');
+        return;
+    }
+    
+    // Demander les autres informations
     const date = prompt("Date (YYYY-MM-DD) :");
     if (!date) return;
+    
     const debut = prompt("Heure début (HH:MM) :");
     if (!debut) return;
+    
     const fin = prompt("Heure fin (HH:MM) :");
     if (!fin) return;
-    const groupe = prompt("Membres du groupe (noms séparés par des virgules) :") || '';
     
+    const groupe = prompt("Membres du groupe (noms séparés par des virgules) :") || '';
+    const commentaire = prompt("Commentaire (optionnel) :") || '';
+    
+    // Créer le formulaire
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = "{{ url_for('reserver_machine') }}";
@@ -124,8 +184,15 @@ function reserverMachine(machineId) {
         'date_reservation': date,
         'heure_debut': debut,
         'heure_fin': fin,
-        'membres_groupe': groupe
+        'membres_groupe': groupe,
+        'type_reservation': type,
+        'ue_projet': ueProjet,
+        'commentaire': commentaire
     };
+    
+    if (seanceId) {
+        fields['seance_id'] = seanceId;
+    }
     
     for (const [name, value] of Object.entries(fields)) {
         const input = document.createElement('input');

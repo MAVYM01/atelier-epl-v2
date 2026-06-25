@@ -13,6 +13,19 @@
         <div class="stat-card info"><div class="stat-icon">👥</div><div class="stat-value">{{ inscriptions_attente }}</div><div class="stat-label">Inscriptions en attente</div></div>
     </div>
 
+
+    <!-- GRAPHIQUES -->
+    <div class="charts-grid">
+        <div class="card">
+            <h3>📊 Répartition des machines</h3>
+            <canvas id="statutChart" width="400" height="200"></canvas>
+        </div>
+        <div class="card">
+            <h3>🏆 Machines les plus utilisées</h3>
+            <canvas id="topMachinesChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+
     <!-- INSCRIPTIONS EN ATTENTE -->
     <div class="card" id="users">
         <h2>📋 Inscriptions en attente de validation</h2>
@@ -23,7 +36,13 @@
                 {% for u in inscriptions %}
                 <tr>
                     <td>{{ u.nom_complet }}</td>
-                    <td>{{ u.email }}</td>
+                    <td>
+                        {% if current_user.role == 'admin' %}
+                            {{ u.email }}
+                        {% else %}
+                            <span class="hidden-email">● ● ● ● @ ● ● ●</span>
+                        {% endif %}
+                    </td>
                     <td>{{ u.role }}</td>
                     <td>{{ u.created_at }}</td>
                     <td>
@@ -39,7 +58,7 @@
         {% endif %}
     </div>
 
-    <!-- GESTION MACHINES -->
+        <!-- GESTION MACHINES -->
     <div class="card" id="machines">
         <h2>🛠️ Gestion des machines</h2>
         <div class="add-form">
@@ -70,6 +89,9 @@
                         {% if m.statut != 'irreparable' %}
                             <a href="{{ url_for('admin_irreparable_machine', machine_id=m.id) }}" class="btn-irreparable">⚫ Irréparable</a>
                         {% endif %}
+                        <a href="{{ url_for('declarer_panne', machine_id=m.id) }}" 
+                        class="btn-panne" 
+                        onclick="return confirm('Déclarer cette machine en panne ?')">⚠️ Panne</a>
                         <a href="{{ url_for('admin_supprimer_machine', machine_id=m.id) }}" class="btn-delete">🗑️</a>
                     </td>
                 </tr>
@@ -121,4 +143,36 @@
         </table>
     </div>
 </div>
+
+
+<script>
+fetch('/api/stats')
+    .then(response => response.json())
+    .then(data => {
+        // Graphique des statuts
+        new Chart(document.getElementById('statutChart'), {
+            type: 'doughnut',
+            data: {
+                labels: data.statuts.map(s => s.statut),
+                datasets: [{
+                    data: data.statuts.map(s => s.total),
+                    backgroundColor: ['#38a169', '#e53e3e', '#ed8936', '#a0aec0']
+                }]
+            }
+        });
+        
+        // Graphique des machines les plus utilisées
+        new Chart(document.getElementById('topMachinesChart'), {
+            type: 'bar',
+            data: {
+                labels: data.top_machines.map(m => m.nom),
+                datasets: [{
+                    label: "Nombre d'utilisations",
+                    data: data.top_machines.map(m => m.utilisations),
+                    backgroundColor: '#4361ee'
+                }]
+            }
+        });
+    });
+</script>
 {% endblock %}
